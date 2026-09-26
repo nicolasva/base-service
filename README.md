@@ -165,49 +165,45 @@ Le service peut utiliser des modèles Active Record, des helpers Rails et des
 méthodes privées comme n'importe quel objet Ruby :
 
 ```ruby
-module SecuritiesRegisters
-  class ReinvestmentAmountCalculService < Service::Base
+module Billing
+  class DiscountedPriceService < Service::Base
     include ActionView::Helpers::NumberHelper
 
     def call
-      return 0 unless holder.dividend_reinvestment?
-      return 0 unless holder.dividend_reinvestment_prct.present?
+      return 0 unless customer.discount_enabled?
+      return 0 unless customer.discount_percentage.present?
 
-      calculate_amount_to_reinvest
+      calculate_discounted_price
     end
 
     private
 
-    def calculate_amount_to_reinvest
-      basic_amount =
-        holder.dividend_reinvestment_prct.to_f / 100 * @remaining_amount
+    def calculate_discounted_price
+      discount =
+        customer.discount_percentage.to_f / 100 * @original_price
 
-      return 0 if basic_amount <
-        holder.dividend_reinvestment_threshold.to_f
+      return @original_price if discount < customer.minimum_discount.to_f
 
-      share_value = securities_register.security_price(securities_nature)
-      return 0 if share_value.blank?
+      unit_price = catalog.price_for(product)
+      return @original_price if unit_price.blank?
 
-      if securities_nature.decimalization_coefficient.zero?
-        (basic_amount / share_value).truncate * share_value
+      if product.sold_in_whole_units?
+        (discount / unit_price).truncate * unit_price
       else
-        basic_amount
+        discount
       end
     end
 
-    def securities_register
-      @securities_register ||=
-        @dividend_retribution
-          .dividend_retribution_template
-          .securities_register
+    def catalog
+      @catalog ||= @order.store.catalog
     end
 
-    def holder
-      @holder ||= @dividend_retribution.user.holder(securities_register)
+    def customer
+      @customer ||= @order.customer
     end
 
-    def securities_nature
-      @securities_nature ||= securities_register.securities_natures.first
+    def product
+      @product ||= @order.products.first
     end
   end
 end
@@ -216,64 +212,64 @@ end
 Appel du service :
 
 ```ruby
-result = SecuritiesRegisters::ReinvestmentAmountCalculService.call(
-  remaining_amount: 10_000,
-  dividend_retribution: dividend_retribution
+result = Billing::DiscountedPriceService.call(
+  original_price: 10_000,
+  order: order
 )
 
 if result.successful?
-  amount = result.result
+  discounted_price = result.result
 else
   Rails.logger.error(result.errors.map(&:message))
 end
 ```
 
 L'instance du service reste mutable pendant l'exécution. Les mémorisations
-avec `||=`, comme `@holder ||= ...`, fonctionnent donc normalement.
+avec `||=`, comme `@customer ||= ...`, fonctionnent donc normalement.
 
-## Exemple de création d'une transaction
+## Exemple de création d'une commande
 
 ```ruby
-module SecuritiesRegisters
-  class GenerateScheduledTransactionService < Service::Base
+module Orders
+  class CreateOrderService < Service::Base
     def call
-      transaction = generate_scheduled_transaction
-      generate_backer_from_transaction(transaction)
-      transaction
+      order = create_order
+      create_invoice_for(order)
+      order
     end
 
     private
 
-    def generate_scheduled_transaction
-      transaction = SecuritiesRegister::Transaction.new(
-        securities_register_id: @register.id,
-        buyer_id: @scheduled_investment.user.id,
-        amount: @scheduled_investment.amount
+    def create_order
+      order = Order.new(
+        customer_id: @customer.id,
+        product_id: @product.id,
+        quantity: @quantity
       )
 
-      unless transaction.save
-        transaction.errors.messages.each do |type, messages|
+      unless order.save
+        order.errors.messages.each do |type, messages|
           append_error(type, messages)
         end
       end
 
-      transaction
+      order
     end
 
-    def generate_backer_from_transaction(transaction)
-      return unless transaction.persisted?
+    def create_invoice_for(order)
+      return unless order.persisted?
 
-      backer = Backer.new(
-        project: transaction.securities_register.project,
-        user_id: transaction.buyer_id,
-        value: transaction.amount
+      invoice = Invoice.new(
+        order: order,
+        customer: order.customer,
+        total: order.total
       )
 
-      return if backer.save
+      return if invoice.save
 
       append_error(
-        "CreateScheduledInvestmentTransactionFailed",
-        "Backer could not be created for transaction #{transaction.id}"
+        :invoice_creation_failed,
+        "Invoice could not be created for order #{order.id}"
       )
     end
   end
@@ -281,21 +277,22 @@ end
 ```
 
 ```ruby
-result = SecuritiesRegisters::GenerateScheduledTransactionService.call(
-  register: register,
-  scheduled_investment: scheduled_investment
+result = Orders::CreateOrderService.call(
+  customer: customer,
+  product: product,
+  quantity: 2
 )
 
-transaction = result.result
+order = result.result
 
 if result.successful?
-  redirect_to transaction_path(transaction)
+  redirect_to order_path(order)
 else
   flash.now[:alert] = result.errors.map(&:message).join(", ")
 end
 ```
 
-Le service retourne la transaction dans `result.result`, même si des erreurs
+Le service retourne la commande dans `result.result`, même si des erreurs
 ont été ajoutées. C'est `result.successful?` qui indique si l'exécution est
 considérée comme réussie.
 
@@ -305,23 +302,24 @@ Un service peut appeler un autre service. Il faut vérifier le
 `Service::Result` retourné et récupérer explicitement sa valeur métier :
 
 ```ruby
-class ProcessInvestmentService < Service::Base
+class CheckoutService < Service::Base
   def call
-    transaction_result =
-      SecuritiesRegisters::GenerateScheduledTransactionService.call(
-        register: @register,
-        scheduled_investment: @scheduled_investment
+    order_result =
+      Orders::CreateOrderService.call(
+        customer: @customer,
+        product: @product,
+        quantity: @quantity
       )
 
-    unless transaction_result.successful?
-      transaction_result.errors.each do |error|
+    unless order_result.successful?
+      order_result.errors.each do |error|
         append_error(error.type, error.message)
       end
 
       return nil
     end
 
-    transaction_result.result
+    order_result.result
   end
 end
 ```
@@ -332,16 +330,17 @@ service appelant. L'exemple ci-dessus les propage explicitement.
 ## Utilisation dans un contrôleur Rails
 
 ```ruby
-class ScheduledTransactionsController < ApplicationController
+class OrdersController < ApplicationController
   def create
     result =
-      SecuritiesRegisters::GenerateScheduledTransactionService.call(
-        register: register,
-        scheduled_investment: scheduled_investment
+      Orders::CreateOrderService.call(
+        customer: current_customer,
+        product: product,
+        quantity: params[:quantity]
       )
 
     if result.successful?
-      redirect_to transaction_path(result.result), notice: "Transaction created"
+      redirect_to order_path(result.result), notice: "Order created"
     else
       flash.now[:alert] = result.errors.map(&:message).join(", ")
       render :new, status: :unprocessable_entity
