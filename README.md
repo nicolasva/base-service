@@ -1,5 +1,7 @@
 # Base Service
 
+[![CI](https://github.com/nicolasva/base-service/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasva/base-service/actions/workflows/ci.yml)
+
 `base-service` fournit une classe de base légère pour construire des services
 Ruby avec une interface commune :
 
