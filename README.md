@@ -4,7 +4,7 @@
 [![Code Climate](https://codeclimate.com/github/nicolasva/base-service.svg)](https://codeclimate.com/github/nicolasva/base-service)
 [![Gem Version](https://badge.fury.io/rb/base-service.svg)](https://rubygems.org/gems/base-service)
 [![Documentation Status](https://img.shields.io/badge/docs-RubyDoc.info-blue.svg)](https://www.rubydoc.info/gems/base-service)
-[![Downloads](https://img.shields.io/gem/dt/base-service.svg?style=flat)](https://rubygems.org/gems/base-service)
+[![Downloads](https://img.shields.io/gem/dt/base-service?style=flat&cacheSeconds=300)](https://rubygems.org/gems/base-service)
 
 `base-service` provides a lightweight base class for building Ruby service
 objects with a consistent interface:
