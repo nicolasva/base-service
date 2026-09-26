@@ -16,6 +16,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.metadata["rubygems_mfa_required"] = "true"
+  spec.metadata["documentation_uri"] = "https://www.rubydoc.info/gems/base-service/#{spec.version}"
   spec.metadata["source_code_uri"] = spec.homepage
 
   spec.add_dependency "callback-collection", "~> 0.2"

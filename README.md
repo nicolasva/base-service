@@ -1,6 +1,10 @@
 # Base Service
 
-[![CI](https://github.com/nicolasva/base-service/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasva/base-service/actions/workflows/ci.yml)
+[![Build Status](https://github.com/nicolasva/base-service/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolasva/base-service/actions/workflows/ci.yml)
+[![Code Climate](https://codeclimate.com/github/nicolasva/base-service.svg)](https://codeclimate.com/github/nicolasva/base-service)
+[![Gem Version](https://badge.fury.io/rb/base-service.svg)](https://rubygems.org/gems/base-service)
+[![Documentation Status](https://img.shields.io/badge/docs-RubyDoc.info-blue.svg)](https://www.rubydoc.info/gems/base-service)
+[![Downloads](https://img.shields.io/gem/dt/base-service.svg?style=flat)](https://rubygems.org/gems/base-service)
 
 `base-service` fournit une classe de base légère pour construire des services
 Ruby avec une interface commune :
@@ -429,3 +433,30 @@ bundle exec rake
 ```
 
 La tâche par défaut exécute les tests puis construit la gem dans `pkg/`.
+
+## Publication sur RubyGems
+
+Les versions sont publiées avec
+[RubyGems Trusted Publishing](https://guides.rubygems.org/trusted-publishing/).
+Aucune clé API RubyGems ne doit être ajoutée aux secrets GitHub.
+
+Avant la première publication, créez un **Pending Trusted Publisher** dans
+votre profil RubyGems avec les paramètres suivants :
+
+- gem : `base-service` ;
+- propriétaire du dépôt : `nicolasva` ;
+- dépôt : `base-service` ;
+- workflow : `release.yml` ;
+- environnement GitHub : `release`.
+
+Publiez ensuite une version en créant un tag correspondant exactement à
+`Service::VERSION` :
+
+```sh
+VERSION=$(ruby -Ilib -rbase_service/version -e 'print Service::VERSION')
+git tag "v${VERSION}"
+git push origin "v${VERSION}"
+```
+
+Le workflow GitHub Actions construit alors la gem et la publie sur RubyGems.
+RubyDoc génère automatiquement la documentation de la version publiée.
