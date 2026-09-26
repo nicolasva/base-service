@@ -6,43 +6,43 @@
 [![Documentation Status](https://img.shields.io/badge/docs-RubyDoc.info-blue.svg)](https://www.rubydoc.info/gems/base-service)
 [![Downloads](https://img.shields.io/gem/dt/base-service.svg?style=flat)](https://rubygems.org/gems/base-service)
 
-`base-service` fournit une classe de base légère pour construire des services
-Ruby avec une interface commune :
+`base-service` provides a lightweight base class for building Ruby service
+objects with a consistent interface:
 
-- les paramètres nommés deviennent des variables d'instance ;
-- la logique métier est définie dans une méthode `call` sans argument ;
-- les erreurs et les messages sont collectés pendant l'exécution ;
-- chaque appel retourne un objet `Service::Result` ;
-- des callbacks nommés peuvent être configurés grâce à
+- keyword arguments become instance variables;
+- business logic is defined in a zero-argument `call` method;
+- errors and messages are collected during execution;
+- every call returns a `Service::Result`;
+- named callbacks can be configured through
   [`callback-collection`](https://github.com/nicolasva/callback-collection).
 
 ## Installation
 
-Ajoutez la gem au `Gemfile` de l'application :
+Add the gem to your application's `Gemfile`:
 
 ```ruby
 gem "base-service"
 ```
 
-Puis installez les dépendances :
+Then install the dependencies:
 
 ```sh
 bundle install
 ```
 
-Dans une application Ruby sans Bundler, chargez explicitement la gem :
+In a Ruby application that does not use Bundler, require the gem explicitly:
 
 ```ruby
 require "base_service"
 ```
 
-Rails charge normalement la gem automatiquement lorsqu'elle est déclarée dans
-le `Gemfile`.
+Rails normally loads the gem automatically when it is declared in the
+`Gemfile`.
 
-## Créer un service
+## Creating a service
 
-Un service hérite de `Service::Base` et implémente une méthode publique `call`
-sans argument :
+A service inherits from `Service::Base` and implements a public, zero-argument
+`call` method:
 
 ```ruby
 class DoubleValueService < Service::Base
@@ -55,19 +55,19 @@ class DoubleValueService < Service::Base
 end
 ```
 
-Les arguments nommés transmis au service sont automatiquement disponibles sous
-forme de variables d'instance. Ici, `value: 21` devient `@value`.
+Keyword arguments passed to the service are automatically exposed as instance
+variables. In this example, `value: 21` becomes `@value`.
 
 ```ruby
 result = DoubleValueService.call(value: 21)
 ```
 
-Il n'est pas nécessaire d'écrire un constructeur dans chaque service.
+There is no need to define an initializer in every service.
 
-## Résultat d'un appel
+## Call results
 
-`MonService.call(...)` ne retourne pas directement la valeur métier. Il
-retourne toujours un `Service::Result` :
+`MyService.call(...)` does not return the business value directly. It always
+returns a `Service::Result`:
 
 ```ruby
 result = DoubleValueService.call(value: 21)
@@ -78,21 +78,21 @@ result.errors      # => []
 result.messages    # => ["Value doubled"]
 ```
 
-| Méthode | Description |
+| Method | Description |
 |---|---|
-| `result.result` | Valeur retournée par la méthode `call` du service |
-| `result.errors` | Tableau des erreurs ajoutées pendant l'exécution |
-| `result.messages` | Tableau des messages ajoutés pendant l'exécution |
-| `result.successful?` | `true` lorsque `result.errors` est vide |
+| `result.result` | The value returned by the service's `call` method |
+| `result.errors` | Errors appended during execution |
+| `result.messages` | Messages appended during execution |
+| `result.successful?` | `true` when `result.errors` is empty |
 
-L'objet `Service::Result` ainsi que ses tableaux `errors` et `messages` sont
-gelés après l'exécution. La valeur métier contenue dans `result.result` n'est
-pas gelée automatiquement.
+The `Service::Result` object and its `errors` and `messages` arrays are frozen
+after execution. The business value stored in `result.result` is not
+automatically frozen.
 
-## Ajouter des erreurs
+## Adding errors
 
-La méthode protégée `append_error(type, message)` ajoute un objet
-`Service::Error` au résultat :
+The protected `append_error(type, message)` method adds a `Service::Error` to
+the result:
 
 ```ruby
 class CreateUserService < Service::Base
@@ -111,20 +111,19 @@ end
 ```ruby
 result = CreateUserService.call(user: user)
 
-result.successful? # => false si au moins une erreur a été ajoutée
+result.successful? # => false when at least one error was appended
 
 error = result.errors.first
 error.type         # => :email
 error.message      # => ["has already been taken"]
-error.caller_info  # => emplacement où append_error a été appelé
+error.caller_info  # => location where append_error was called
 ```
 
-Le type et le message ne sont pas transformés par la gem. Ils peuvent donc
-reprendre directement les valeurs fournies par Rails ou par le domaine métier.
+The gem does not transform the error type or message. They can therefore use
+values supplied directly by Rails or by the application's domain.
 
-`append_error` enregistre uniquement l'erreur : il ne lève pas d'exception et
-n'arrête pas automatiquement le service. Utilisez `return` lorsque l'exécution
-doit s'arrêter :
+`append_error` only records an error. It does not raise an exception or stop
+the service automatically. Use `return` when execution must stop:
 
 ```ruby
 def call
@@ -137,13 +136,13 @@ def call
 end
 ```
 
-Les exceptions levées par la logique métier, Active Record ou un callback ne
-sont pas interceptées. Elles remontent normalement à l'appelant.
+Exceptions raised by business logic, Active Record, or a callback are not
+rescued by `Service::Base`. They propagate to the caller normally.
 
-## Ajouter des messages
+## Adding messages
 
-La méthode protégée `append_message(message)` ajoute une information non
-bloquante au résultat :
+The protected `append_message(message)` method adds non-blocking information
+to the result:
 
 ```ruby
 class ImportUserService < Service::Base
@@ -160,15 +159,15 @@ result = ImportUserService.call(attributes: { email: "ruby@example.com" })
 
 result.successful? # => true
 result.messages    # => ["User 42 imported"]
-result.result      # => instance de User
+result.result      # => a User instance
 ```
 
-Ajouter un message ne modifie pas la valeur de `successful?`.
+Adding a message does not affect `successful?`.
 
-## Exemple avec un service Rails
+## Rails service example
 
-Le service peut utiliser des modèles Active Record, des helpers Rails et des
-méthodes privées comme n'importe quel objet Ruby :
+A service can use Active Record models, Rails helpers, and private methods like
+any other Ruby object:
 
 ```ruby
 module Billing
@@ -215,7 +214,7 @@ module Billing
 end
 ```
 
-Appel du service :
+Call the service with keyword arguments:
 
 ```ruby
 result = Billing::DiscountedPriceService.call(
@@ -230,10 +229,10 @@ else
 end
 ```
 
-L'instance du service reste mutable pendant l'exécution. Les mémorisations
-avec `||=`, comme `@customer ||= ...`, fonctionnent donc normalement.
+The service instance remains mutable during execution. Memoization with `||=`,
+such as `@customer ||= ...`, therefore works as expected.
 
-## Exemple de création d'une commande
+## Order creation example
 
 ```ruby
 module Orders
@@ -298,14 +297,14 @@ else
 end
 ```
 
-Le service retourne la commande dans `result.result`, même si des erreurs
-ont été ajoutées. C'est `result.successful?` qui indique si l'exécution est
-considérée comme réussie.
+The service returns the order in `result.result` even when errors were
+appended. Use `result.successful?` to determine whether the execution was
+successful.
 
-## Utilisation dans un autre service
+## Calling a service from another service
 
-Un service peut appeler un autre service. Il faut vérifier le
-`Service::Result` retourné et récupérer explicitement sa valeur métier :
+A service can call another service. Check the returned `Service::Result` and
+retrieve its business value explicitly:
 
 ```ruby
 class CheckoutService < Service::Base
@@ -330,10 +329,10 @@ class CheckoutService < Service::Base
 end
 ```
 
-Les erreurs d'un sous-service ne sont pas automatiquement copiées dans le
-service appelant. L'exemple ci-dessus les propage explicitement.
+Errors from a nested service are not copied automatically to the calling
+service. The example above propagates them explicitly.
 
-## Utilisation dans un contrôleur Rails
+## Using a service in a Rails controller
 
 ```ruby
 class OrdersController < ApplicationController
@@ -357,8 +356,8 @@ end
 
 ## Callbacks
 
-Le bloc transmis à `.call` ou `.new` construit une collection de callbacks
-immuable fournie par la gem `callback-collection` :
+The block passed to `.call` or `.new` builds an immutable callback collection
+provided by the `callback-collection` gem:
 
 ```ruby
 class NotifyUserService < Service::Base
@@ -386,71 +385,71 @@ result = NotifyUserService.call(user_id: 42) do |callbacks|
 end
 ```
 
-Les callbacks ne sont pas exécutés automatiquement par `Service::Base`. Le
-service choisit quand les appeler avec :
+Callbacks are not invoked automatically by `Service::Base`. The service
+decides when to invoke them:
 
 ```ruby
-@callbacks.respond_with(:nom_du_callback, argument)
+@callbacks.respond_with(:callback_name, argument)
 ```
 
-L'opérateur `&.` permet de rendre le bloc de callbacks facultatif. Sans `&.`,
-le service doit être appelé avec le callback attendu.
+The safe navigation operator (`&.`) makes the callback block optional. Without
+it, the service must be called with the expected callback.
 
-La collection est gelée après sa configuration. Un callback inconnu provoque
-une `NoMethodError`, et une exception levée dans un callback remonte à
-l'appelant.
+The collection is frozen after configuration. Invoking an unknown callback
+raises `NoMethodError`, and exceptions raised inside callbacks propagate to
+the caller.
 
-Consultez la documentation de
-[`callback-collection`](https://github.com/nicolasva/callback-collection) pour
-les callbacks enregistrés par méthode et la compatibilité avec les Ractors.
+See the
+[`callback-collection`](https://github.com/nicolasva/callback-collection)
+documentation for method-based callback registration and Ractor
+compatibility.
 
-## Instanciation manuelle
+## Manual instantiation
 
-La forme recommandée est :
+The recommended form is:
 
 ```ruby
 result = MyService.call(argument: value)
 ```
 
-Elle équivaut à :
+It is equivalent to:
 
 ```ruby
 service = MyService.new(argument: value)
 result = service.execute
 ```
 
-Dans les deux cas, `execute` crée un nouveau contexte d'exécution, appelle la
-méthode métier `call`, puis construit un `Service::Result`.
+In both cases, `execute` creates a new execution context, invokes the business
+`call` method, and builds a `Service::Result`.
 
-Évitez de réutiliser une même instance avec plusieurs appels à `execute`. La
-forme `MyService.call(...)` crée une instance dédiée pour chaque exécution.
+Avoid reusing the same instance for multiple calls to `execute`.
+`MyService.call(...)` creates a dedicated instance for each execution.
 
-## Développement
+## Development
 
 ```sh
 bundle install
 bundle exec rake
 ```
 
-La tâche par défaut exécute les tests puis construit la gem dans `pkg/`.
+The default task runs the test suite and then builds the gem in `pkg/`.
 
-## Publication sur RubyGems
+## Publishing to RubyGems
 
-Les versions sont publiées avec
+Releases use
 [RubyGems Trusted Publishing](https://guides.rubygems.org/trusted-publishing/).
-Aucune clé API RubyGems ne doit être ajoutée aux secrets GitHub.
+No RubyGems API key needs to be stored in GitHub secrets.
 
-Avant la première publication, créez un **Pending Trusted Publisher** dans
-votre profil RubyGems avec les paramètres suivants :
+Configure a trusted publisher for the gem on RubyGems with the following
+values:
 
-- gem : `base-service` ;
-- propriétaire du dépôt : `nicolasva` ;
-- dépôt : `base-service` ;
-- workflow : `release.yml` ;
-- environnement GitHub : `release`.
+- gem: `base-service`;
+- repository owner: `nicolasva`;
+- repository: `base-service`;
+- workflow: `release.yml`;
+- GitHub environment: leave blank.
 
-Publiez ensuite une version en créant un tag correspondant exactement à
-`Service::VERSION` :
+Publish a version by creating a tag that exactly matches `Service::VERSION`:
 
 ```sh
 VERSION=$(ruby -Ilib -rbase_service/version -e 'print Service::VERSION')
@@ -458,5 +457,5 @@ git tag "v${VERSION}"
 git push origin "v${VERSION}"
 ```
 
-Le workflow GitHub Actions construit alors la gem et la publie sur RubyGems.
-RubyDoc génère automatiquement la documentation de la version publiée.
+GitHub Actions then builds and publishes the gem to RubyGems. RubyDoc
+automatically generates documentation for the published version.
