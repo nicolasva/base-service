@@ -10,9 +10,10 @@ Gem::Specification.new do |spec|
   spec.summary = "An immutable base class for Ruby service objects"
   spec.description = "Build service objects with isolated execution contexts, immutable results, and named callbacks."
   spec.homepage = "https://github.com/nicolasva/base-service"
+  spec.license = "MIT"
   spec.required_ruby_version = ">= 2.7"
 
-  spec.files = Dir["lib/**/*.rb", "README.md"]
+  spec.files = Dir["lib/**/*.rb", "README.md", "LICENSE.txt"]
   spec.require_paths = ["lib"]
 
   spec.metadata["rubygems_mfa_required"] = "true"
